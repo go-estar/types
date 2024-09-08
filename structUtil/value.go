@@ -1,13 +1,12 @@
 package structUtil
 
 import (
-	stderrors "errors"
 	"github.com/pkg/errors"
 	"reflect"
 )
 
-var ErrorFieldInvalid = stderrors.New("field invalid")
-var ErrorFieldCantSet = stderrors.New("field can't set")
+var ErrorFieldInvalid = "field %s invalid"
+var ErrorFieldCantSet = "field %s can't set"
 
 func SetValue(obj interface{}, field string, value interface{}) error {
 	valueV := reflect.ValueOf(obj)
@@ -17,11 +16,11 @@ func SetValue(obj interface{}, field string, value interface{}) error {
 
 	fieldV := valueV.FieldByName(field)
 	if !fieldV.IsValid() {
-		return errors.WithMessage(ErrorFieldInvalid, field)
+		return errors.Errorf(ErrorFieldInvalid, field)
 	}
 
 	if !fieldV.CanSet() {
-		return errors.WithMessage(ErrorFieldCantSet, field)
+		return errors.Errorf(ErrorFieldCantSet, field)
 	}
 
 	fieldV.Set(reflect.ValueOf(value))
@@ -36,7 +35,7 @@ func GetValue(obj interface{}, field string) (interface{}, error) {
 
 	fieldV := valueV.FieldByName(field)
 	if !fieldV.IsValid() {
-		return nil, errors.WithMessage(ErrorFieldInvalid, field)
+		return nil, errors.Errorf(ErrorFieldInvalid, field)
 	}
 	return fieldV.Interface(), nil
 }
