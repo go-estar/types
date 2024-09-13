@@ -2,6 +2,14 @@ package fieldUtil
 
 import "reflect"
 
+func IsNil(s interface{}) bool {
+	if s == nil {
+		return true
+	}
+	v := reflect.ValueOf(s)
+	return v.Kind() == reflect.Ptr && v.IsNil()
+}
+
 func IsEmpty(s interface{}) bool {
 	if s == nil {
 		return true
