@@ -1,17 +1,42 @@
-package structUtil
+package mapUtil
 
 import (
+	"encoding/json"
 	"github.com/go-estar/types/fieldUtil"
-	"github.com/go-estar/types/stringUtil"
 	"github.com/thoas/go-funk"
 	"reflect"
 	"sort"
 )
 
+func FromStruct(from interface{}) (map[string]interface{}, error) {
+	var m = make(map[string]interface{})
+	tmp, err := json.Marshal(from)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := json.Unmarshal(tmp, &m); err != nil {
+		return nil, err
+	}
+	return m, nil
+}
+
+func ToStruct(from interface{}, to interface{}) error {
+	//return mapstructure.Decode(from, to)
+	tmp, err := json.Marshal(from)
+	if err != nil {
+		return err
+	}
+	if err := json.Unmarshal(tmp, to); err != nil {
+		return err
+	}
+	return nil
+}
+
 type ToSortStringOption func(*ToSortStringConfig)
 
 type ToSortStringConfig struct {
-	SortKeysConfig
+	Exclude        []string
 	IgnoreEmptyStr bool
 	NoSeparator    bool
 	Separator      string
@@ -22,12 +47,6 @@ type ToSortStringConfig struct {
 func ToSortStringWithExclude(val ...string) ToSortStringOption {
 	return func(opts *ToSortStringConfig) {
 		opts.Exclude = append(opts.Exclude, val...)
-	}
-}
-
-func ToSortStringWithAnonymousField() ToSortStringOption {
-	return func(opts *ToSortStringConfig) {
-		opts.AnonymousField = true
 	}
 }
 
@@ -60,10 +79,11 @@ func ToSortStringWithNoConnector() ToSortStringOption {
 	}
 }
 
-func ToSortString(obj interface{}, opts ...ToSortStringOption) string {
+func ToSortString(obj map[string]interface{}, opts ...ToSortStringOption) string {
 	if obj == nil {
 		return ""
 	}
+
 	c := &ToSortStringConfig{}
 	for _, apply := range opts {
 		if apply != nil {
@@ -77,21 +97,19 @@ func ToSortString(obj interface{}, opts ...ToSortStringOption) string {
 		c.Connector = "="
 	}
 
-	v := reflect.ValueOf(obj)
-	if v.Kind() == reflect.Ptr {
-		if v.IsNil() {
-			return ""
+	var keys []string
+	for k := range obj {
+		if len(c.Exclude) > 0 && funk.ContainsString(c.Exclude, k) {
+			continue
 		}
-		v = v.Elem()
+		keys = append(keys, k)
 	}
-	t := v.Type()
+	sort.Strings(keys)
 
-	keys := SortKeys(t, &c.SortKeysConfig)
 	var str = ""
 	for _, key := range keys {
-		name := stringUtil.FirstCharToLower(key)
 		var value string
-		field := v.FieldByName(key)
+		field := reflect.ValueOf(obj[key])
 		if field.Kind() == reflect.Ptr {
 			if field.IsNil() {
 				value = ""
@@ -108,35 +126,7 @@ func ToSortString(obj interface{}, opts ...ToSortStringOption) string {
 		if str != "" {
 			str += c.Separator
 		}
-		str += name + c.Connector + value
+		str += key + c.Connector + value
 	}
 	return str
-}
-
-type SortKeysConfig struct {
-	Exclude        []string
-	AnonymousField bool
-}
-
-func SortKeys(t reflect.Type, c *SortKeysConfig) []string {
-	var keys []string
-	for k := 0; k < t.NumField(); k++ {
-		if len(c.Exclude) > 0 && funk.ContainsString(c.Exclude, t.Field(k).Name) {
-			continue
-		}
-		if t.Field(k).Anonymous {
-			if c.AnonymousField {
-				ft := t.Field(k).Type
-				if ft.Kind() == reflect.Ptr {
-					ft = ft.Elem()
-				}
-				res := SortKeys(ft, c)
-				keys = append(keys, res...)
-			}
-		} else {
-			keys = append(keys, t.Field(k).Name)
-		}
-	}
-	sort.Strings(keys)
-	return keys
 }
