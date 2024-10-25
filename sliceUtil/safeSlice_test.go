@@ -36,4 +36,9 @@ func TestSafeSlice(t *testing.T) {
 	for i, v := range ss.Values() {
 		fmt.Println(i, v)
 	}
+
+	ss.Clear()
+
+	a := ss.Values()[0:]
+	fmt.Println(a)
 }

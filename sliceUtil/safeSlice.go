@@ -62,7 +62,11 @@ func (s *SafeSlice[T]) Insert(index int, value *T) bool {
 func (s *SafeSlice[T]) Init(values []*T) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	s.slice = values
+	if values == nil {
+		s.slice = []*T{}
+	} else {
+		s.slice = values
+	}
 }
 
 func (s *SafeSlice[T]) Clear() {
