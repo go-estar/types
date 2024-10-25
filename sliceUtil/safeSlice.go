@@ -4,18 +4,22 @@ import (
 	"sync"
 )
 
+func NewSafeSlice[T any]() *SafeSlice[T] {
+	return &SafeSlice[T]{}
+}
+
 type SafeSlice[T any] struct {
 	mu    sync.RWMutex
 	slice []*T
 }
 
-func (s *SafeSlice[T]) Append(t *T) {
+func (s *SafeSlice[T]) Append(elems ...*T) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	s.slice = append(s.slice, t)
+	s.slice = append(s.slice, elems...)
 }
 
-func (s *SafeSlice[T]) Remove(index int) bool {
+func (s *SafeSlice[T]) RemoveAt(index int) bool {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if index < 0 || index >= len(s.slice) {
@@ -25,37 +29,92 @@ func (s *SafeSlice[T]) Remove(index int) bool {
 	return true
 }
 
-func (s *SafeSlice[T]) Get(index int) (*T, bool) {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-	if index < 0 || index >= len(s.slice) {
-		return nil, false
+func (s *SafeSlice[T]) Remove(fn func(t *T) bool) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	for i := len(s.slice) - 1; i >= 0; i-- {
+		if fn(s.slice[i]) {
+			s.slice = append(s.slice[:i], s.slice[i+1:]...)
+		}
 	}
-	return s.slice[index], true
+}
+
+func (s *SafeSlice[T]) Set(index int, value *T) bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if index < 0 || index >= len(s.slice) {
+		return false
+	}
+	s.slice[index] = value
+	return true
+}
+
+func (s *SafeSlice[T]) Insert(index int, value *T) bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if index < 0 || index > len(s.slice) {
+		return false
+	}
+	s.slice = append(s.slice[:index], append([]*T{value}, s.slice[index:]...)...)
+	return true
+}
+
+func (s *SafeSlice[T]) Init(values []*T) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.slice = values
+}
+
+func (s *SafeSlice[T]) Clear() {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.slice = []*T{}
+}
+
+func (s *SafeSlice[T]) Contains(fn func(t *T) bool) bool {
+	for _, v := range s.slice {
+		if fn(v) {
+			return true
+		}
+	}
+	return false
+}
+
+func (s *SafeSlice[T]) IndexOf(fn func(t *T) bool) int {
+	for i, v := range s.slice {
+		if fn(v) {
+			return i
+		}
+	}
+	return -1
+}
+
+func (s *SafeSlice[T]) Find(fn func(t *T) bool) (int, *T) {
+	for i, v := range s.slice {
+		if fn(v) {
+			return i, v
+		}
+	}
+	return -1, nil
 }
 
 func (s *SafeSlice[T]) Len() int {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
 	return len(s.slice)
 }
 
-// Range 遍历 slice 中的所有元素
-func (s *SafeSlice[T]) Range(f func(index int, value *T)) {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-
-	for i, v := range s.slice {
-		f(i, v)
-	}
+func (s *SafeSlice[T]) Values() []*T {
+	return s.slice
 }
 
-// Snapshot 返回 slice 的拷贝
-func (s *SafeSlice[T]) Snapshot() []*T {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
+func (s *SafeSlice[T]) Get(index int) *T {
+	if index < 0 || index >= len(s.slice) {
+		return nil
+	}
+	return s.slice[index]
+}
 
-	snapshot := make([]*T, len(s.slice))
-	copy(snapshot, s.slice)
-	return snapshot
+func (s *SafeSlice[T]) Copy() *SafeSlice[T] {
+	sliceCopy := make([]*T, len(s.slice))
+	copy(sliceCopy, s.slice)
+	return &SafeSlice[T]{slice: sliceCopy}
 }
